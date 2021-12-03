@@ -1,7 +1,7 @@
 '''
 CS 121: PA 6 - Avian Biodiversity Treemap
 
-YOUR NAME HERE
+Aman Singh Ahluwalia
 
 Code for constructing a treemap.
 '''
@@ -62,6 +62,28 @@ class Rectangle:
     def __repr__(self):
         return str(self)
 
+def compute_rectangles_rec(data, bounding_rec):
+    if data == []:
+        return []
+    total_sum = 0
+    for child in data:
+        total_sum += child.value
+    prev_distortion = 1
+    row_layout = None
+    leftover_rec = None
+    k = 1
+    while k < len(data):
+        row_layout, leftover_rec = compute_row_layout(bounding_rec, data[:k], total_sum)
+        distortion = 1.0
+        for rect in row_layout:
+            aspect_ratio = max(rect.width / rect.height, rect.height / rect.width)
+            distortion = max(aspect_ratio, distortion)
+        if (distortion > prev_distortion):
+            k -= 1
+            break
+        prev_distortion = distortion
+    row_layout, leftover_rec = compute_row_layout(bounding_rec, data[:k], total_sum)
+    return row_layout + compute_rectangles_rec(data[k:], leftover_rec)
 
 def compute_rectangles(t, bounding_rec_width=1.0, bounding_rec_height=1.0):
     '''
@@ -74,9 +96,9 @@ def compute_rectangles(t, bounding_rec_width=1.0, bounding_rec_height=1.0):
 
     Returns: a list of Rectangle objects.
     '''
-
-    # REPLACE pass WITH YOUR CODE
-    pass
+    bounding_rec = Rectangle((0, 0), (bounding_rec_width, bounding_rec_height))
+    sorted_children = sorted_trees(t.children)
+    return compute_rectangles_rec(sorted_children, bounding_rec)
 
 
 def compute_internal_values(t):
