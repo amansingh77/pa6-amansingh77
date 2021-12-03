@@ -1,10 +1,10 @@
-'''
+"""
 CS 121: PA 6 - Avian Biodiversity Treemap
 
 Aman Singh Ahluwalia
 
 Code for constructing a treemap.
-'''
+"""
 
 import json
 import click
@@ -19,26 +19,26 @@ import tree
 
 
 class Rectangle:
-    '''
+    """
     Simple class for representing rectangles.
 
     Attributes:
         x, y: (float) coordinates of rectangle's origin
         width, height: (float) the rectangle's width and height
         label: (str) text label for the rectangle
-        color_code: (tuple) tuple for determining what color the 
+        color_code: (tuple) tuple for determining what color the
             rectangle should be
-    '''
+    """
 
     def __init__(self, origin, size, label="", color_code=("",)):
-        '''
+        """
         Constructs a new Rectangle.
 
         Inputs:
-            origin: (pair of float) x and y coordinates of the 
+            origin: (pair of float) x and y coordinates of the
                 rectangle's origin
             size: (pair of float) the width and height of the rectangle
-        '''
+        """
 
         # Validate parameters
         validate_tuple_param(origin, "origin")
@@ -46,8 +46,9 @@ class Rectangle:
         assert label is not None, "Rectangle label can't be None"
         assert isinstance(label, str), "Rectangle label must be a string"
         assert color_code is not None, "Rectangle color_code can't be None"
-        assert isinstance(color_code, tuple), \
-            "Rectangle color_code must be a tuple"
+        assert isinstance(
+            color_code, tuple
+        ), "Rectangle color_code must be a tuple"
 
         self.x, self.y = origin
         self.width, self.height = size
@@ -56,37 +57,57 @@ class Rectangle:
 
     def __str__(self):
         format_string = "RECTANGLE {:.4f} {:.4f} {:.4f} {:.4f} {}"
-        return format_string.format(self.x, self.y,
-            self.width, self.height, self.label)
+        return format_string.format(
+            self.x, self.y, self.width, self.height, self.label
+        )
 
     def __repr__(self):
         return str(self)
 
-def compute_rectangles_rec(data, bounding_rec):
-    if data == []:
+
+def compute_rectangles_rec(t, bounding_rec, start_ind=0):
+    """
+    Recursively computes the rectangles for drawing a treemap inside
+    the provided bounding rectangle.
+    """
+    if t.children == []:
+        return [bounding_rec]
+    if start_ind >= len(t.children):
         return []
-    total_sum = 0
-    for child in data:
-        total_sum += child.value
-    prev_distortion = 1
-    row_layout = None
-    leftover_rec = None
+    t.children = sorted_trees(t.children)
+    prev_distortion = 1.0
     k = 1
-    while k < len(data):
-        row_layout, leftover_rec = compute_row_layout(bounding_rec, data[:k], total_sum)
+    total_sum = 0
+    for i in range(start_ind, len(t.children)):
+        total_sum += t.children[i].value
+    while start_ind + k <= len(t.children):
+        row_layout, leftover_rec = compute_row(
+            bounding_rec, t.children[start_ind : start_ind + k], total_sum
+        )
         distortion = 1.0
-        for rect in row_layout:
-            aspect_ratio = max(rect.width / rect.height, rect.height / rect.width)
+        for (rect, _) in row_layout:
+            aspect_ratio = max(
+                rect.width / rect.height, rect.height / rect.width
+            )
             distortion = max(aspect_ratio, distortion)
-        if (distortion > prev_distortion):
+        if distortion > prev_distortion and k > 1:
             k -= 1
             break
         prev_distortion = distortion
-    row_layout, leftover_rec = compute_row_layout(bounding_rec, data[:k], total_sum)
-    return row_layout + compute_rectangles_rec(data[k:], leftover_rec)
+        k += 1
+    row_layout, leftover_rec = compute_row(
+        bounding_rec, t.children[start_ind : start_ind + k], total_sum
+    )
+    rectangles = []
+    for (rect, child) in row_layout:
+        rect.label = child.key
+        rect.color_code = child.path
+        rectangles += compute_rectangles_rec(child, rect)
+    return rectangles + compute_rectangles_rec(t, leftover_rec, start_ind + k)
+
 
 def compute_rectangles(t, bounding_rec_width=1.0, bounding_rec_height=1.0):
-    '''
+    """
     Computes the rectangles for drawing a treemap of the provided tree.
 
     Inputs:
@@ -95,14 +116,17 @@ def compute_rectangles(t, bounding_rec_width=1.0, bounding_rec_height=1.0):
             of the bounding rectangle.
 
     Returns: a list of Rectangle objects.
-    '''
-    bounding_rec = Rectangle((0, 0), (bounding_rec_width, bounding_rec_height))
-    sorted_children = sorted_trees(t.children)
-    return compute_rectangles_rec(sorted_children, bounding_rec)
+    """
+    compute_internal_values(t)
+    compute_paths(t)
+    bounding_rec = Rectangle(
+        (0.0, 0.0), (bounding_rec_width, bounding_rec_height)
+    )
+    return compute_rectangles_rec(t, bounding_rec)
 
 
 def compute_internal_values(t):
-    '''
+    """
     Assign a value to the internal nodes. The value of the leaves should
     already be set. The value of an internal node is the sum of the value
     of its children.
@@ -111,18 +135,22 @@ def compute_internal_values(t):
         t (Tree): a tree
 
     Returns: The input tree t should be modified so that every internal node's
-        value is set to be the sum of the values of its children. The return 
+        value is set to be the sum of the values of its children. The return
         value is the value of the root of t (that is, t.value).
-    '''
+    """
 
-    # REPLACE pass WITH YOUR CODE
-    pass
+    if t.children == []:
+        return t.value
+    t.value = 0
+    for child in t.children:
+        t.value += compute_internal_values(child)
+    return t.value
 
 
 def compute_paths(t, prefix=()):
-    '''
+    """
     Assign the path attribute of all nodes. The path attribute of a node
-    should be a tuple of strings made up of the keys of the nodes along a 
+    should be a tuple of strings made up of the keys of the nodes along a
     full path through the tree from the root down to, but not including,
     that node. For example, following the path
         "class Aves" --> "order Passeriformes" --> "family Passerellidae"
@@ -137,10 +165,14 @@ def compute_paths(t, prefix=()):
 
     Returns: Nothing. The input tree t should be modified to contain a path
         attribute for all nodes.
-    '''
+    """
+    t.path = prefix
 
-    # REPLACE pass WITH YOUR CODE
-    pass
+    if t.children == []:
+        return
+    for child in t.children:
+        child.path = prefix + (t.key,)
+        compute_paths(child, child.path)
 
 
 #############################
@@ -151,21 +183,25 @@ def compute_paths(t, prefix=()):
 
 
 def validate_tuple_param(p, name):
-    '''
+    """
     Validate a tuple parameter.
-    '''
+    """
 
-    assert isinstance(p, (list, tuple)) and len(p) == 2 \
-        and isinstance(p[0], float) and isinstance(p[1], float), \
-        name + " parameter to Rectangle must be a tuple or list of two floats"
+    assert (
+        isinstance(p, (list, tuple))
+        and len(p) == 2
+        and isinstance(p[0], float)
+        and isinstance(p[1], float)
+    ), (name + " parameter to Rectangle must be a tuple or list of two floats")
 
-    assert p[0] >= 0.0 and p[1] >= 0.0, \
-        "Incorrect value for rectangle {}: ({}, {}) ".format(name, p[0], p[1]) + \
-        "(both values must be >= 0)"
+    assert p[0] >= 0.0 and p[1] >= 0.0, (
+        "Incorrect value for rectangle {}: ({}, {}) ".format(name, p[0], p[1])
+        + "(both values must be >= 0)"
+    )
 
 
 def load_trees(filename):
-    '''
+    """
     Loads trees from a json file. The json file
     should consist of a dictionary mapping tree
     names to trees represented as lists.
@@ -175,7 +211,7 @@ def load_trees(filename):
 
     Returns: dictionary mapping tree names (strings)
         to Tree instances.
-    '''
+    """
 
     with open(filename) as f:
         trees_json = json.load(f)
@@ -183,7 +219,7 @@ def load_trees(filename):
 
 
 def list_to_tree(lst):
-    '''
+    """
     Converts a list to a tree. The first element
     of the list should be a dictionary mapping
     attributes to values. The remaining elements
@@ -194,14 +230,14 @@ def list_to_tree(lst):
         lst: list representing a tree.
 
     Returns: a Tree instance.
-    '''
+    """
 
     root = lst[0]
     children = lst[1:]
-    t = tree.Tree(fancy_get(root, 'key'), fancy_get(root, 'value'))
+    t = tree.Tree(fancy_get(root, "key"), fancy_get(root, "value"))
     for attrname in root:
         attrvalue = fancy_get(root, attrname)
-        if attrname not in ['key', 'value']:
+        if attrname not in ["key", "value"]:
             setattr(t, attrname, attrvalue)
     for child_list in children:
         t.add_child(list_to_tree(child_list))
@@ -209,9 +245,9 @@ def list_to_tree(lst):
 
 
 def fancy_get(d, key, default=None):
-    '''
+    """
     Gets a value from a dictionary, but converts a list to a tuple.
-    '''
+    """
     val = d.get(key, default)
     if isinstance(val, list):
         return tuple(val)
@@ -220,7 +256,7 @@ def fancy_get(d, key, default=None):
 
 
 def sorted_trees(tree_list):
-    '''
+    """
     Sort a list of Tree instances by the value of their roots in descending
     order. Ties are broken by the key of the root, in (forward) alphabetical
     order. Returns a new sorted list without modifying the input list.
@@ -229,13 +265,13 @@ def sorted_trees(tree_list):
         tree_list: list of Tree instances, each with an integer value.
 
     Returns: list of Tree instances, sorted.
-    '''
+    """
 
     return sorted(tree_list, key=lambda t: (-t.value, t.key))
 
 
 def compute_row(bounding_rec, row_data, total_sum):
-    '''
+    """
     Lay out the given data points as rectangles in one row of a
     treemap. The row will be against the left or top edge of the
     bounding rectangle, depending on whether the rectangle is at least
@@ -254,21 +290,23 @@ def compute_row(bounding_rec, row_data, total_sum):
             t is the Tree that Rectangle corresponds to, and
         leftover_rec: a Rectangle representing the leftover space in the
             bounding rectangle that was not used by this row.
-    '''
+    """
 
     if bounding_rec.width >= bounding_rec.height:
         return __compute_row_wide(bounding_rec, row_data, total_sum)
     else:
         row_layout_t, leftover_rec_t = __compute_row_wide(
-            __transpose_rectangle(bounding_rec), row_data, total_sum)
-        row_layout = [(__transpose_rectangle(rec), tr)
-            for rec, tr in row_layout_t]
+            __transpose_rectangle(bounding_rec), row_data, total_sum
+        )
+        row_layout = [
+            (__transpose_rectangle(rec), tr) for rec, tr in row_layout_t
+        ]
         leftover_rec = __transpose_rectangle(leftover_rec_t)
         return row_layout, leftover_rec
 
 
 def __transpose_rectangle(rec):
-    '''
+    """
     Returns a new rectangle that is the transpose of the input: The x and y
     attributes are switched, as are width and height. The label and
     color_code attributes are preserved.
@@ -277,21 +315,22 @@ def __transpose_rectangle(rec):
         rec: (Rectangle)
 
     Returns: (Rectangle) transpose of rec.
-    '''
+    """
 
-    return Rectangle((rec.y, rec.x), (rec.height, rec.width),
-        rec.label, rec.color_code)
+    return Rectangle(
+        (rec.y, rec.x), (rec.height, rec.width), rec.label, rec.color_code
+    )
 
 
 def __compute_row_wide(bounding_rec, row_data, total_sum):
-    '''
+    """
     Helper function for compute_row. Serves the same purpose as compute_row,
     but only when the bounding rectangle is at least as wide as it is tall.
 
     Inputs: Same as compute_row, except that bounding_rec must have a width
         greater than or equal to its height.
     Returns: Same as compute_row.
-    '''
+    """
 
     assert bounding_rec.width >= bounding_rec.height
 
@@ -301,21 +340,22 @@ def __compute_row_wide(bounding_rec, row_data, total_sum):
     y = bounding_rec.y
     for t in row_data:
         height = bounding_rec.height * t.value / row_sum
-        rec = Rectangle((bounding_rec.x, y),
-                        (row_width, height))
+        rec = Rectangle((bounding_rec.x, y), (row_width, height))
         if rec.width > 0 and rec.height > 0:
             row_layout.append((rec, t))
         y += height
-    leftover = Rectangle((bounding_rec.x + row_width, bounding_rec.y),
-                         (bounding_rec.width - row_width, bounding_rec.height))
+    leftover = Rectangle(
+        (bounding_rec.x + row_width, bounding_rec.y),
+        (bounding_rec.width - row_width, bounding_rec.height),
+    )
 
     return row_layout, leftover
 
 
 @click.command(name="treemap")
-@click.argument('tree_file', type=click.Path(exists=True))
-@click.argument('key', type=str)
-@click.option('--output', '-o', type=str)
+@click.argument("tree_file", type=click.Path(exists=True))
+@click.argument("key", type=str)
+@click.option("--output", "-o", type=str)
 def cmd(tree_file, key, output):
     import drawing
 
@@ -335,5 +375,6 @@ def cmd(tree_file, key, output):
     else:
         drawing.draw_rectangles(rectangles, output)
 
+
 if __name__ == "__main__":
-    cmd() # pylint: disable=no-value-for-parameter
+    cmd()  # pylint: disable=no-value-for-parameter
